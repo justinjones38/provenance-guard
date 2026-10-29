@@ -38,7 +38,14 @@
 
 <!-- The path a submission takes, from arriving to the label a reader sees.
      Six or seven steps — this is the trace you wrote in Milestone 1. -->
-
+The file goes from the writer's request (POST /submit with text and creato_id).
+It then goes to the route in app.py, which parses and validates the input. Then it creates a content_id. Then it goes to the following files:
+1. detector.model_signal - GPT-2 runs on your machine and measures how predictable the text is 
+2. stylometry.style_signal - it measures variation in sentence length, vocabulary variety, and punctuation.
+3. scoring.combine_signals - it combines your 2 scores into one scores
+4. scoring.score_to_label - it turns your score into words to easily whether the text is human, unsure, or AI
+5. audit.log_decision. - everything is written to this file
+Then it brings the JSON response, which the reader sees.
 
 
 ---
@@ -53,19 +60,34 @@
 
 ### Signal one — the model signal
 
-**What it measures:**
+**What it measures:** the perplexity, to see how the predictable the text is to GPT-2, which is then converted to a 0-1 score.
 
 **Why that might differ between human and AI writing:**
+AI writes by choosing the mostly like nxt words, so a model finds text by AI easy to predict.
 
 **What it can't see:**
+Some humans (like me) write very plain text. So, people who write plain may come across as AI.
 
 ### Signal two — the style signal
 
-**What it measures:**
+**What it measures:** the shape without meaning, such as the difference in sentence length, the variety of vocabulary, and the punctuation used.
 
-**Why that might differ between human and AI writing:**
+**Why that might differ between human and AI writing:** 
+AI writes even, mid-length sentences with a simple vocabulary. Humans typically vary in sentence length, can have typos, and often vary widely with vocabulary.
 
 **What it can't see:**
+It will struggle with typos, grammatically incorrect sentences, which can change the score without changing who wrote the text.
+
+### Endpoints
+The two endpoints are POST /submit and POST /appeal
+
+**POST/submit**
+Input => It takes in text and the creator_id.
+Output => It returns the content_id, guess, confidence, label, model_score, and style_score
+
+**POST/appeal**
+Input => It takes in content_id and reasoning
+Output => It returns a confirmation and the status of the item changed to under_review
 
 ### The combining rule
 
