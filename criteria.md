@@ -45,11 +45,11 @@ Two things worth knowing before you pick numbers:
 ## 1.
 
 <!-- Your criterion. It must name a number. -->
-
+Of 10 paragpghs that I wrote myself, at most 1 is labelled as high-confidence AI in every one of 3 trials.
 
 
 **Why this target:**
-
+As seen in school, a wrong accusation is far more damaging than a missed detection, So, that is the goal of this target.
 
 
 ---
@@ -57,11 +57,11 @@ Two things worth knowing before you pick numbers:
 ## 2.
 
 <!-- Your criterion. -->
-
+All 3 labels (human, unsure, AI) is producted by at least one of the test inputs.
 
 
 **Why this target:**
-
+A label that nothing can reach is a broken range. I want to test for all possible labels, so each label need to be included.
 
 
 ---
@@ -69,11 +69,11 @@ Two things worth knowing before you pick numbers:
 ## 3.
 
 <!-- Your criterion. -->
-
+Clearly-AI text averages at least 0.33 higher on combined score than obvious human-text.
 
 
 **Why this target:**
-
+I want there to be a large gap between text that is clearly AI and human. If two text score close together, then run-to-run variation can change the label.
 
 
 ---
@@ -81,11 +81,11 @@ Two things worth knowing before you pick numbers:
 ## 4.
 
 <!-- Your criterion. -->
-
+All appeals (5 our of 5) appeals on real_content_ids change the status to under_review and write an appeal entry to the log, and an appeal on a made-up content_id returns 404 and changes nothing
 
 
 **Why this target:**
-
+The appeal is the only thing standing between a wrong accusation and nothing. So, it must every time.
 
 
 ---
@@ -94,10 +94,10 @@ Two things worth knowing before you pick numbers:
 
 <!-- Your criterion. -->
 
-
+Every incorrect request (such as missing or empty text, null, or over the word limit) returns a 400 level error with a JSON message. 
 
 **Why this target:**
-
+A crash on bad input causes a lot of real faulures, so I am trying to prevent that.
 
 
 ---
