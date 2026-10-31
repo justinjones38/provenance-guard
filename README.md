@@ -211,9 +211,9 @@ The original decision stays in the log and the appeal is added after it, so the 
 
 **Moment 2**
 
-- *What I asked for:*
-- *What came back:*
-- *What I changed:*
+- *What I asked for:* tips on setting up with Git Bash  
+- *What came back:* it gave me advice on differences needed to setup with Git bash
+- *What I changed:* I used the instructions for Git Bash
 
 <!-- ═══════════════════════ UNIT 8 — THE TEST ═══════════════════════ -->
 
