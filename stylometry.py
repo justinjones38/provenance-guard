@@ -63,9 +63,19 @@ def sentence_length_spread(text: str) -> float:
     Watch the edge case: a one-sentence submission has no spread at all, and
     `stdev` raises on fewer than two values. Decide what that should return
     before the attack set decides for you.
+
+    Decision: coefficient of variation (stdev / mean) of words per sentence.
+    0.0 means every sentence is the same length; human prose usually lands
+    around 0.4–0.8. **Higher means more human.** Fewer than two sentences
+    returns 0.0 here, and style_signal treats that case as "no evidence"
+    rather than "perfectly even".
     """
-    # TODO: replace this
-    return 0.0
+    lengths = [len(words(s)) for s in sentences(text)]
+    lengths = [n for n in lengths if n > 0]
+    if len(lengths) < 2:
+        return 0.0
+    mean = statistics.mean(lengths)
+    return round(statistics.stdev(lengths) / mean, 4)
 
 
 def type_token_ratio(text: str) -> float:
@@ -79,9 +89,22 @@ def type_token_ratio(text: str) -> float:
     longer, because common words repeat. Two texts of different lengths aren't
     directly comparable on it, and if your test inputs vary a lot in length,
     that alone can look like a signal.
+
+    Decision: to blunt the length effect, this is a moving-average ratio —
+    the plain ratio inside every 50-word window, averaged. Texts shorter than
+    one window get the plain ratio. **Higher means more human.**
     """
-    # TODO: replace this
-    return 0.0
+    tokens = words(text)
+    if not tokens:
+        return 0.0
+    window = 50
+    if len(tokens) <= window:
+        return round(len(set(tokens)) / len(tokens), 4)
+    ratios = [
+        len(set(tokens[i:i + window])) / window
+        for i in range(len(tokens) - window + 1)
+    ]
+    return round(statistics.mean(ratios), 4)
 
 
 def punctuation_density(text: str) -> float:
@@ -93,9 +116,18 @@ def punctuation_density(text: str) -> float:
         semicolons, dashes — is a real choice. Semicolons and em dashes are
         more interesting than full stops, because they vary more between
         writers.
+
+    Decision: count only the "expressive" marks — commas, semicolons, colons,
+    dashes, brackets, quotes, ! and ? — and skip full stops, which mostly
+    track sentence count. Returned per word, so typically 0.0–0.3.
+    **Higher means more human** — a guess to check against the calibration
+    inputs, since some models lean hard on commas and em dashes.
     """
-    # TODO: replace this
-    return 0.0
+    tokens = words(text)
+    if not tokens:
+        return 0.0
+    marks = re.findall(r"[,;:!?()\"“”‘’\-–—]", text)
+    return round(len(marks) / len(tokens), 4)
 
 
 # ── Combining them ───────────────────────────────────────────────────────────
@@ -121,9 +153,49 @@ def style_signal(text: str) -> float:
     clearly human, plain conventional human writing, lightly-edited AI — before
     you trust it. Plain and ordinary, not formal: formal prose reads as *human*
     to signal one, and it is plain writing that gets accused.
+
+    Decisions:
+      1. All three measures run "higher = more human", so each is flipped.
+      2. Each is scaled to 0–1 "human-ness" by a linear ramp between an
+         AI-ish anchor (0) and a human-ish anchor (1), clamped. The anchors
+         in _ANCHORS are starting guesses — tune them on the calibration set.
+      3. Weighted average: spread 0.65, vocabulary 0.10, punctuation 0.25.
+         Vocabulary started at 0.30 and was cut after calibration: formal AI
+         prose uses many distinct long words, so it scored as *more* varied
+         than casual human writing — pointing the wrong way.
+      4. A one-sentence text has no spread, so that measure scores a neutral
+         0.5 instead of "perfectly even".
     """
-    # TODO: replace this
-    return 0.5
+    if not words(text):
+        return 0.5
+
+    if len(sentences(text)) < 2:
+        spread_h = 0.5
+    else:
+        spread_h = _ramp(sentence_length_spread(text), *_ANCHORS["spread"])
+    vocab_h = _ramp(type_token_ratio(text), *_ANCHORS["vocab"])
+    punct_h = _ramp(punctuation_density(text), *_ANCHORS["punct"])
+
+    human_ness = (
+        _WEIGHTS["spread"] * spread_h
+        + _WEIGHTS["vocab"] * vocab_h
+        + _WEIGHTS["punct"] * punct_h
+    )
+    return round(1.0 - human_ness, 4)
+
+
+# (AI-ish value, human-ish value) for each measure.
+_ANCHORS = {
+    "spread": (0.20, 0.65),
+    "vocab": (0.60, 0.85),
+    "punct": (0.05, 0.20),
+}
+_WEIGHTS = {"spread": 0.65, "vocab": 0.10, "punct": 0.25}
+
+
+def _ramp(value: float, low: float, high: float) -> float:
+    """Map value onto 0–1: low -> 0, high -> 1, clamped either side."""
+    return min(max((value - low) / (high - low), 0.0), 1.0)
 
 
 if __name__ == "__main__":
@@ -139,4 +211,3 @@ if __name__ == "__main__":
     print(f"type_token_ratio         {type_token_ratio(text)}")
     print(f"punctuation_density      {punctuation_density(text)}")
     print(f"style_signal             {style_signal(text)}   (higher = more likely AI)")
-    print("\nAll zeros? These are stubs — Milestone 4 is where you build them.")

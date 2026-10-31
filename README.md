@@ -38,7 +38,14 @@
 
 <!-- The path a submission takes, from arriving to the label a reader sees.
      Six or seven steps — this is the trace you wrote in Milestone 1. -->
-
+The file goes from the writer's request (POST /submit with text and creator_id).
+It then goes to the route in app.py, which parses and validates the input. Then it creates a content_id. Then it goes to the following files:
+1. detector.model_signal - GPT-2 runs on your machine and measures how predictable the text is 
+2. stylometry.style_signal - it measures variation in sentence length, vocabulary variety, and punctuation.
+3. scoring.combine_signals - it combines your 2 scores into one score
+4. scoring.score_to_label - it turns your score into words that say whether the text is human, unsure, or AI
+5. audit.log_decision - everything is written to logs/audit.jsonl
+Then it brings the JSON response, which the reader sees.
 
 
 ---
@@ -53,19 +60,34 @@
 
 ### Signal one — the model signal
 
-**What it measures:**
+**What it measures:** the perplexity, to see how predictable the text is to GPT-2, which is then converted to a 0-1 score.
 
 **Why that might differ between human and AI writing:**
+AI writes by choosing the most likely next words, so a model finds text by AI easy to predict.
 
 **What it can't see:**
+Some humans (like me) write very plain text. So, people who write plain may come across as AI.
 
 ### Signal two — the style signal
 
-**What it measures:**
+**What it measures:** the shape without meaning, such as the difference in sentence length, the variety of vocabulary, and the punctuation used.
 
-**Why that might differ between human and AI writing:**
+**Why that might differ between human and AI writing:** 
+AI writes even, mid-length sentences with a simple vocabulary. Humans typically vary in sentence length, can have typos, and often vary widely with vocabulary.
 
 **What it can't see:**
+It will struggle with typos, grammatically incorrect sentences, which can change the score without changing who wrote the text.
+
+### Endpoints
+The two endpoints are POST /submit and POST /appeal
+
+**POST/submit**
+Input => It takes in text and the creator_id.
+Output => It returns the content_id, guess, confidence, label, model_score, style_score, and combined_score. Missing, too-short, or too-long text gets a 400 and is logged as a rejection.
+
+**POST/appeal**
+Input => It takes in content_id and reasoning
+Output => It returns a confirmation and the status of the item changed to under_review. An unknown content_id gets a 404.
 
 ### The combining rule
 
@@ -73,8 +95,10 @@
      signals disagree? -->
 
 **The rule:**
+The combined score is a weighted average: 0.6 × model score + 0.4 × style score. A text can only be labelled AI if both signals lean AI (each at 0.5 or above); if either one leans human, the result is capped at "unsure". When the signals disagree, the system doesn't accuse — a false accusation costs a writer more than a missed AI text costs anyone.
 
 **The numbers:**
+Model weight 0.6, style weight 0.4. Agreement gate: both signals must be ≥ 0.5 for an "ai" label, otherwise the score is capped at 0.64. Thresholds: 0.35 or below is human, 0.65 or above is AI, anything between is unsure. Inside the style signal: sentence-length spread 0.65, vocabulary variety 0.10, punctuation density 0.25. Vocabulary was cut from 0.30 because it scored formal AI text as more varied than casual human writing.
 
 **Where it lives:** `scoring.py::combine_signals`
 
@@ -82,7 +106,9 @@
      somewhere else, say where. -->
 
 **A case where my two signals split, and what my rule does with it:**
+When my two signals split on my own short story (model 0.445, a coin flip, against style 0.16, clearly human), my rule averages them 60/40 to about 0.33, just under the 0.35 human threshold, so it's labelled human without the agreement gate needing to step in.
 
+The agreement gate fires on `samples/ai_edited.json`, AI-style text with a few very short sentences dropped in: model 0.908 (confidently AI) against style 0.301 (leans human). The plain average is 0.665, which would be labelled AI, but because the style signal leans human the rule caps it at 0.64 and the writer sees "unsure" instead of an accusation.
 
 
 ---
@@ -96,15 +122,15 @@
 
 | Label | Score range | The exact text a reader sees |
 |---|---|---|
-| high-confidence human |  |  |
-| unsure |  |  |
-| high-confidence AI |  |  |
+| high-confidence human | 0.00 – 0.35 | "This looks like it was written by a person." |
+| unsure | above 0.35 and below 0.65 (and any score where the two signals disagree) | "We can't tell either way. Plenty of people write in a style that's hard to call, so this isn't a judgment about you or your work." |
+| high-confidence AI | 0.65 – 1.00, and only if both signals lean AI | "This looks like it was probably written with an AI tool. We could be wrong — if you wrote it yourself, you can appeal and a person will review it." |
 
 **Why I worded the "unsure" one this way:**
 <!-- It's the hardest of the three. It has to admit uncertainty without
      sounding like an accusation, because the person reading it may well have
      written every word themselves. -->
-
+It says the system couldn't decide, not that the writer did anything wrong. My own plain writing lands in this band, so I wrote it as something I'd be fine reading about my own work: it names the cause (some styles are hard to call) and says outright that it isn't a judgment about the writer.
 
 
 ---
@@ -122,36 +148,56 @@
      diagnostics. -->
 
 ```bash
-$ curl -X POST http://127.0.0.1:5000/submit \
-  -H "Content-Type: application/json" \
-  -d '{"text": "...", "creator_id": "..."}'
+$ curl -X POST http://127.0.0.1:5000/submit   -H "Content-Type: application/json"   --data-binary @samples/ai_listy.json
 ```
 
 ```json
+{
+  "combined_score": 0.6866,
+  "confidence": 0.3732,
+  "content_id": "05302ec6-e981-4db0-a99c-c1414d070cc9",
+  "creator_id": "test-ai",
+  "guess": "ai",
+  "label": "This looks like it was probably written with an AI tool. We could be wrong — if you wrote it yourself, you can appeal and a person will review it.",
+  "model_score": 0.7544,
+  "style_score": 0.585
+}
+```
 
+The other two labels, from the same run:
+
+```json
+{"content_id": "5acf1a44-5275-4cdd-ae74-483db40100a4", "creator_id": "test-borderline", "guess": "unsure", "combined_score": 0.3919, "model_score": 0.3489, "style_score": 0.4565}
+{"content_id": "5591674e-5bb0-49ed-ac8a-dbed204d7742", "creator_id": "test-human", "guess": "human", "combined_score": 0.3287, "model_score": 0.4445, "style_score": 0.1551}
 ```
 
 **An appeal**
 
 ```bash
-$ curl -X POST http://127.0.0.1:5000/appeal \
-  -H "Content-Type: application/json" \
-  -d '{"content_id": "...", "reasoning": "..."}'
+$ curl -X POST http://127.0.0.1:5000/appeal   -H "Content-Type: application/json"   -d '{"content_id": "05302ec6-e981-4db0-a99c-c1414d070cc9", "reasoning": "I wrote this myself for a workplace training handout. It is formal because the handout had to be."}'
 ```
 
 ```json
-
+{
+  "content_id": "05302ec6-e981-4db0-a99c-c1414d070cc9",
+  "message": "Thanks — your appeal has been recorded and a person will review this result. Nothing changes until they do.",
+  "original_guess": "ai",
+  "status": "under_review"
+}
 ```
 
 **What the log shows afterwards**
 
 ```bash
-$ curl "http://127.0.0.1:5000/log?limit=3"
+$ grep 05302ec6-e981-4db0-a99c-c1414d070cc9 logs/audit.jsonl
 ```
 
 ```json
-
+{"timestamp": "2026-10-31T03:38:13+00:00", "content_id": "05302ec6-e981-4db0-a99c-c1414d070cc9", "creator_id": "test-ai", "guess": "ai", "model_score": 0.7544, "style_score": 0.585, "combined_score": 0.6866, "label": "This looks like it was probably written with an AI tool. We could be wrong — if you wrote it yourself, you can appeal and a person will review it.", "status": "decided", "confidence": 0.3732}
+{"timestamp": "2026-10-31T03:38:13+00:00", "content_id": "05302ec6-e981-4db0-a99c-c1414d070cc9", "creator_id": "test-ai", "event": "appeal", "status": "under_review", "reasoning": "I wrote this myself for a workplace training handout. It is formal because the handout had to be."}
 ```
+
+The original decision stays in the log and the appeal is added after it, so the history shows what was decided and that it was challenged.
 
 ---
 
@@ -159,15 +205,15 @@ $ curl "http://127.0.0.1:5000/log?limit=3"
 
 **Moment 1**
 
-- *What I asked for:*
-- *What came back:*
+- *What I asked for:* help me complete the submit function in app.py
+- *What came back:* it offered tips how to complete the submit function
 - *What I changed:*
 
 **Moment 2**
 
-- *What I asked for:*
-- *What came back:*
-- *What I changed:*
+- *What I asked for:* tips on setting up with Git Bash  
+- *What came back:* it gave me advice on differences needed to setup with Git bash
+- *What I changed:* I used the instructions for Git Bash
 
 <!-- ═══════════════════════ UNIT 8 — THE TEST ═══════════════════════ -->
 

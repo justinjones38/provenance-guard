@@ -1,0 +1,7 @@
+weights: {'spread': 0.45, 'vocab': 0.3, 'punct': 0.25}
+
+sample                 model   style     gap  combined  guess
+------------------------------------------------------------------
+ai_listy              0.7544  0.4797  0.2747    0.6170  unsure
+borderline            0.3489  0.3850  0.0361    0.3669  unsure
+human_casual          0.4445  0.1887  0.2558    0.3166  human

@@ -18,6 +18,10 @@ you claim, so that line should read `scoring.py::combine_signals`.
 
 import config
 
+# Both signals must reach this for the combined score to be allowed into the
+# AI band.
+AGREEMENT_GATE = 0.5
+
 
 def combine_signals(model_score: float, style_score: float) -> float:
     """
@@ -52,11 +56,17 @@ def combine_signals(model_score: float, style_score: float) -> float:
     The weights in config.py are placeholders. Change them, or ignore them and
     write a different rule.
     """
-    # TODO: replace this
-    return (
+    score = (
         config.WEIGHT_MODEL_SIGNAL * model_score
         + config.WEIGHT_STYLE_SIGNAL * style_score
     )
+    # Agreement gate: "ai" needs both signals to lean AI. If either reads
+    # human, the most this can reach is "unsure" — a split is uncertainty,
+    # and a false accusation costs a writer more than a miss costs anyone.
+    if min(model_score, style_score) < AGREEMENT_GATE:
+        score = min(score, config.AI_THRESHOLD - 0.01)
+    return round(score, 4)
+
 
 
 def score_to_label(score: float) -> tuple[str, str]:
@@ -85,12 +95,18 @@ def score_to_label(score: float) -> tuple[str, str]:
     think if they got it on their own work. That question is the whole
     milestone.
     """
-    # TODO: replace this — thresholds are in config.py
     if score >= config.AI_THRESHOLD:
-        return "ai", "PLACEHOLDER — write the high-confidence AI label."
+        return "ai", (
+            "This looks like it was probably written with an AI tool. We could "
+            "be wrong — if you wrote it yourself, you can appeal and a person "
+            "will review it."
+        )
     if score <= config.HUMAN_THRESHOLD:
-        return "human", "PLACEHOLDER — write the high-confidence human label."
-    return "unsure", "PLACEHOLDER — write the unsure label."
+        return "human", "This looks like it was written by a person."
+    return "unsure", (
+        "We can't tell either way. Plenty of people write in a style that's "
+        "hard to call, so this isn't a judgment about you or your work."
+    )
 
 
 def label_ranges() -> list[tuple[str, str]]:
