@@ -1,0 +1,22 @@
+# Criterion 1: ten paragraphs I wrote myself. One paragraph per block,
+# with a blank line between paragraphs. Lines starting with # are ignored.
+
+I knew React, HTML, CSS, JavaScript, and a lot of the Git related queries. I understand how those worked. I understand most of the front-end tools in job descriptions.
+
+I did not know about Agile, PostgreSQL, Angular and a lot of those terms. For example, I did not understand what they mean by RestAPIs and how they work. I am still learning about that.
+
+Keywords include Agile, PostgreSQL, and Angular. I also did not understand Scrum and how that worked.
+
+I have a lot of the front-end skills like React and familiarity with Git and version control. I feel comfortable working in groups and working on code. I have strong written and verbal skills and feel comfortable communicating with others.
+
+I feel like one of the things that gets mentioned most is the importance of written and verbal communication. I have seen that mentioned multiple times.
+
+I am familiar with CI/CD and testing frameworks. I am always intimidated when CI/CD gets mentioned because it feels like it would be difficult to learn. It also mentions Next.js, which I feel like I can learn over some time
+
+I didn't sleep. Not properly, anyway — I lay there listening to the boiler tick and thinking about the thing I'd said to Marcus at the pub, which was stupid, and which he will absolutely bring up again. Twice now. So: coffee, and the long way round to work, and a plan. The plan lasted until about ten past nine, when Priya asked how the weekend was and I said "fine" in the voice that means it wasn't, and she put her mug down and looked at me. That's the trouble with Priya. She notices.
+
+I like going to the store and buying random items. It is very fun and enjoyable. It is great fun.
+
+I have been using Indeed for the longest and I have found Indeed the easiest to use. I think LinkedIn has way too much fluff and a lot of unnecessary things. I really do not like LinkedIn much. I find Indeed way easier to use. It is just focused on job searching and I think it is simple and easy to use. I also like Google for jobs and Glassdoor, but I like Indeed more for its simplicity.
+
+I think searching for a junior web developer role and it brought up a lot of different results for good positions. I think it gave great results when searching. I think searching for specific skills like React also brought good results

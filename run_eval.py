@@ -66,6 +66,59 @@ def describe(body):
     return json.dumps(body)[:120]
 
 
+def run_appeals(requests, args, spec):
+    """
+    The appeal path, end to end — added in unit 8 for criterion 4.
+
+    For each text: submit it, appeal the content_id that came back, then read
+    the log and check the appeal entry is there with status under_review. For
+    each fake id: appeal it and check it 404s and leaves nothing in the log.
+    """
+    results = []
+    for i, text in enumerate(spec.get("texts", []), 1):
+        row = {"kind": "real", "sent": text[:70]}
+        try:
+            sub = requests.post(f"{args.url}/submit",
+                                json={"text": text, "creator_id": f"eval_appeal_{i}"},
+                                timeout=args.timeout)
+            content_id = sub.json().get("content_id")
+            row.update(submit_status=sub.status_code, content_id=content_id,
+                       original_guess=sub.json().get("guess"))
+            app = requests.post(f"{args.url}/appeal",
+                                json={"content_id": content_id,
+                                      "reasoning": "I wrote this myself."},
+                                timeout=args.timeout)
+            row.update(appeal_status=app.status_code,
+                       returned_status=app.json().get("status"))
+            log = requests.get(f"{args.url}/log", timeout=args.timeout).json()
+            appeal_entries = [e for e in log["entries"]
+                              if e.get("content_id") == content_id
+                              and e.get("event") == "appeal"
+                              and e.get("status") == "under_review"]
+            row["appeal_logged"] = len(appeal_entries)
+            row["ok"] = (app.status_code == 200
+                         and row["returned_status"] == "under_review"
+                         and len(appeal_entries) == 1)
+        except Exception as exc:  # noqa: BLE001
+            row.update(ok=False, error=f"{type(exc).__name__}: {exc}")
+        results.append(row)
+
+    for fake in spec.get("fake_ids", []):
+        row = {"kind": "fake", "content_id": fake}
+        try:
+            app = requests.post(f"{args.url}/appeal",
+                                json={"content_id": fake, "reasoning": "test"},
+                                timeout=args.timeout)
+            log = requests.get(f"{args.url}/log", timeout=args.timeout).json()
+            touched = [e for e in log["entries"] if e.get("content_id") == fake]
+            row.update(appeal_status=app.status_code, log_entries=len(touched),
+                       ok=app.status_code == 404 and not touched)
+        except Exception as exc:  # noqa: BLE001
+            row.update(ok=False, error=f"{type(exc).__name__}: {exc}")
+        results.append(row)
+    return results
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -112,6 +165,13 @@ def main():
 
         trials = []
         for trial in range(1, args.trials + 1):
+            if scenario.get("appeals"):
+                results = run_appeals(requests, args, scenario["appeals"])
+                trials.append(results)
+                marks = [f"{r['kind']}:{'ok' if r['ok'] else 'FAIL'}" for r in results]
+                print(f"  trial {trial}: {', '.join(marks)}")
+                continue
+
             results = []
             for i, body in enumerate(bodies_for(scenario), 1):
                 preview = describe(body)
@@ -123,6 +183,8 @@ def main():
                         "status": response.status_code,
                         "guess": payload.get("guess"),
                         "confidence": payload.get("confidence"),
+                        "combined_score": payload.get("combined_score"),
+                        "error": payload.get("error"),
                         "model_score": payload.get("model_score"),
                         "style_score": payload.get("style_score"),
                         "label": payload.get("label"),

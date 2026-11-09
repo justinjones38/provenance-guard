@@ -75,7 +75,14 @@ WEIGHT_STYLE_SIGNAL = 0.4
 # that decide who pays for it.
 
 HUMAN_THRESHOLD = 0.35
-AI_THRESHOLD = 0.65
+
+# Unit 8 improvement: raised from 0.65 to 0.85. In the "before" attack run, four
+# genuine human pieces (formal report, non-native speaker, rubric essay,
+# technical docs) scored 0.77–0.83 and were labelled AI, with BOTH signals
+# leaning AI, so the agreement gate couldn't catch them. Real AI text scores in
+# the same range, so this trades AI detection for fewer false accusations.
+# AI201_AI_THRESHOLD=0.65 reproduces the "before" behaviour.
+AI_THRESHOLD = float(os.getenv("AI201_AI_THRESHOLD", "0.85"))
 
 # ⚠️ One thing that catches people out in Milestone 5. A weighted average can
 # only land between its two inputs — so while `style_signal` is still the stub
@@ -95,10 +102,11 @@ AI_THRESHOLD = 0.65
 # an hour, and a script sending a thousand variations to map your thresholds.
 # Your README has to say why your numbers and not others.
 
-RATE_LIMITING_ENABLED = os.getenv("AI201_RATE_LIMITS", "0") == "1"
+# Unit 8, Milestone 1: on by default. AI201_RATE_LIMITS=0 turns it off.
+RATE_LIMITING_ENABLED = os.getenv("AI201_RATE_LIMITS", "1") == "1"
 
 RATE_LIMIT_PER_MINUTE = 10
-RATE_LIMIT_PER_DAY = 200
+RATE_LIMIT_PER_DAY = 100
 
 # Flask-Limiter warns loudly without this. In-memory is right for one laptop
 # and wrong for anything real — a restart forgets every count, and two copies
